@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	crp "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	mbase "github.com/multiformats/go-multibase"
@@ -25,7 +24,7 @@ var (
 
 func main() {
 	size := flag.Int("bitsize", 2048, "select the bitsize of the key to generate")
-	typ := flag.String("type", "", "select type of key to generate (RSA, Ed25519, Secp256k1 or ECDSA)")
+	typ := flag.String("type", "ed25519", "select type of key to generate (RSA, Ed25519, Secp256k1 or ECDSA)")
 	key := flag.String("key", "", "specify the location of the key to decode it's peerID")
 	fast := flag.Bool("fast", false, "fast generate")
 	timeout := flag.Duration("timeout", 10*time.Minute, "timeout")
@@ -153,8 +152,6 @@ func saveToFile(data []byte, filePath string) {
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
-
-	return
 }
 
 type Config struct {
@@ -191,7 +188,8 @@ func worker(ctx context.Context, config Config, id int, resultChan chan Result, 
 			resultChan <- Result{Cancelled: true}
 			return
 		default:
-			priv, pub, err := crp.GenerateKeyPair(crp.Ed25519, 2048)
+			// Use 0 for Ed25519 bitsize to avoid unnecessary overhead
+			priv, pub, err := crp.GenerateKeyPair(crp.Ed25519, 0)
 			if err != nil {
 				continue
 			}
@@ -201,10 +199,8 @@ func worker(ctx context.Context, config Config, id int, resultChan chan Result, 
 				continue
 			}
 
-			c, err := cid.Decode(peer.ToCid(pid).String())
-			if err != nil {
-				continue
-			}
+			// Avoid encoding->decoding the CID string: get CID directly
+			c := peer.ToCid(pid)
 
 			privateKeyAsb36, err := c.StringOfBase(mbase.Base36)
 			if err != nil {
@@ -242,7 +238,9 @@ func worker(ctx context.Context, config Config, id int, resultChan chan Result, 
 }
 
 func run(config Config) (*Result, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	// use context with timeout so cancellation is automatic
+	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
+	defer cancel()
 
 	resultChan := make(chan Result)
 	var wg sync.WaitGroup
@@ -257,23 +255,23 @@ func run(config Config) (*Result, error) {
 		}(i)
 	}
 
-	// Мониторим результаты и таймаут
+	// Periodically print hashrate until context times out/cancelled
 	go func() {
-		ticker := time.NewTicker(config.Timeout)
+		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-
-		hashrateTicker := time.NewTicker(config.Timeout / 6)
-		defer hashrateTicker.Stop()
 
 		for {
 			select {
-			case <-hashrateTicker.C:
-				x := uint64(time.Since(startTime).Milliseconds())
-				fmt.Printf("Hash rate: ~%d kHz\n", keys/x)
-			case <-ticker.C:
-				_, _ = fmt.Printf("Keys generated: %d\n", keys)
-				cancel()
+			case <-ctx.Done():
+				_, _ = fmt.Printf("Keys generated: %d\n", atomic.LoadUint64(&keys))
 				return
+			case <-ticker.C:
+				elapsed := time.Since(startTime).Seconds()
+				cnt := atomic.LoadUint64(&keys)
+				if elapsed > 0 {
+					rate := float64(cnt) / elapsed
+					fmt.Printf("Hash rate: ~%.2f keys/s\n", rate)
+				}
 			}
 		}
 	}()
