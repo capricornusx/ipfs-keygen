@@ -1,59 +1,110 @@
 # ipfs-keygen
 
-> A tool for easily generating and reading ipfs keypairs
+> A high-performance tool for generating and reading IPFS keypairs with vanity address support
+
+⚡ **Performance: ~540,000 keys/second** on 16-core CPU
 
 ## Table of Contents
 
-- [ipfs-key](#ipfs-key)
-  - [Table of Contents](#table-of-contents)
-  - [Installation](#installation)
-  - [Usage](#usage)
-  - [Contribute](#contribute)
-  - [License](#license)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Fast Vanity Key Generation](#fast-vanity-key-generation)
+  - [Standard Key Generation](#standard-key-generation)
+  - [Reading Keys](#reading-keys)
+  - [Using Keys with IPFS](#using-keys-with-ipfs)
+- [Performance](#performance)
+- [License](#license)
 
+## Installation
 
-## Fast keygen
-
-```
-ipfs-key -fast=true -timeout=1h30m20s -suff=shit,poop,5h1t
-
-Config: {NumWorkers:16 Suffixes:[shit poop 5h1t] Timeout:30s}
-ID for generated key: 12D3KooWSmmfntYfzGLwnR1eptbAtPy7XctUmN9ZeMXTUHjkHXsN
-PKey(base36): k51qzi5uqu5dmgmpktzei3jng83mweiayj41ibtdb4f45idmlc0u13ovgu5h1t
-Found!
+```bash
+# Build from source
+make build
 ```
 
 ## Usage
 
-When run, it will write the bytes of
-the serialized private key to stdout. By default, a 2048 bit RSA key will be
-generated. In this case the key size can be changed by specifying the `-bitsize`
-option. The key type can be changed by specifying the `-type` option (RSA, Ed25519, Secp256k1 or ECDSA).
+### Fast Vanity Key Generation
 
+Generate keys with custom suffixes at high speed:
+
+```bash
+ipfs-key -timeout=1m -suff=test,cool,music
+
+# Output:
+Config: Workers=16, Suffixes=[test cool music], Timeout=1m0s
+Starting key generation...
+
+[5s] 2680000 keys | 536000 keys/s
+ID for generated key: 12D3KooWM71jqVWgASHvhKTcqi8q3HNyuLzYx81s5Vqtzteotest
+PKey(base36): k51qzi5uqu5dkd2ayemr7z4naf7wedezvchgwi5o9fn9t43mryppe4bww3uuib
+
+💾 Key saved: keys/test_20260118_023938.key
+
+✓ Found!
 ```
-$ ipfs-key -bitsize=4096 > my-rsa4096.key
-Generating a 4096 bit RSA key...
-Success!
-ID for generated key: QmS5cwbxmGyPiEH3SYNgiAazG46NvogKxfx2iX6jt4ef1a
-```
-```
-$ ipfs-key -type=ed25519 > my-ed.key
-Generating a 2048 bit ed25519 key...
-Success!
-ID for generated key: 12D3KooWHM4kLNwS2FzN5GtG5Dfy9h7dLTRs3rtuF9NiR4mjBv3h
-```
-```
-$ ipfs-key -key my-ed.key
-Reading key at: my-ed.key
+
+**Options:**
+- `-suff=test,cool` - Comma-separated list of suffixes (min 3 chars)
+- `-timeout=1m` - Maximum search time (default: 10m)
+
+**Key Storage:****
+- Keys are automatically saved to `keys/` directory
+- Filename format: `keys/{suffix}_{timestamp}.key`
+- File permissions: 0600 (read/write for owner only)
+
+**Performance:**
+- 3 chars: ~0.1 seconds
+- 4 chars: ~7 seconds
+- 5 chars: ~3 minutes
+
+### Reading Keys
+
+Display information about existing keys:
+
+```bash
+ipfs-key -key my-key.key
+
+# Output:
+Reading key at: my-key.key
 Success!
 ID for ed25519 key: 12D3KooWF1TKgiqLMh14za7dWMN5RFRC1WAvgHYioksmdwuhZkzT
+Private key (base64): CAESQLg...
 ```
-For backward compatibility, to read RSA and Ed25519 keys generated with raw(), specify the `-type rsa` or `-type ed25519` before the `-key`
+
+### Using Keys with IPFS
+
+Import generated keys into IPFS:
+
+```bash
+# Import key
+ipfs key import mykey keys/music_20260118_023938.key
+
+# Publish content with vanity address
+ipfs name publish --key=mykey /ipfs/QmHash...
+
+# Your content is now at: /ipns/12D3KooW...music
 ```
-$ ipfs-key --type rsa -key my-ed.key
-Reading key at: my-ed.key
-Success!
-ID for rsa key: 12D3KooWF1TKgiqLMh14za7dWMN5RFRC1WAvgHYioksmdwuhZkzT
+
+See [USAGE.md](USAGE.md) for detailed examples and advanced usage.
+
+## Performance
+
+This implementation is highly optimized for multi-core CPUs:
+
+- **Throughput**: ~540,000 keys/second (16 cores)
+- **Efficiency**: Zero allocations in hot path
+- **Scaling**: Linear scaling across CPU cores
+- **Memory**: Minimal GC pressure
+
+See [PERFORMANCE_COMPARISON.md](PERFORMANCE_COMPARISON.md) for detailed benchmarks.
+
+### Calculate Probability
+
+Estimate time to find a vanity suffix:
+
+```bash
+make probability SUFF=test,cool,music
 ```
 
 ## License
