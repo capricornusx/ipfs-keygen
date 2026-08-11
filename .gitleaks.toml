@@ -28,3 +28,13 @@
     '''\b12D3KooW[1-9A-HJ-NP-Za-km-z]{38,46}\b''',
     '''\bk51qzi5uqu5[a-z0-9]{40,60}\b''',
   ]
+
+# libp2p crypto function calls - not secrets
+[[allowlists]]
+  description = "libp2p crypto function calls (UnmarshalEd25519PrivateKey etc.)"
+  regexTarget = "match"
+  regexes = [
+    '''\bUnmarshalEd25519PrivateKey\b''',
+    '''\bGenerateKeyPair\b''',
+    '''\bMarshalPrivateKey\b''',
+  ]
