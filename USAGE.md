@@ -5,8 +5,9 @@
 ### 1. Generate a Vanity Key
 
 ```bash
-ipfs-key -timeout=1m -suff=music
+ipfs-key -timeout=1m -suff=music,tests
 # Output: keys/music_20260118_023938.key
+# Output: keys/tests_20260118_023950.key
 ```
 
 ### 2. Import Key to IPFS

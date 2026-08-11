@@ -1,0 +1,83 @@
+# Canonical golangci-lint config for ipfs-media Go services (golangci-lint v2).
+# Source of truth: ci-templates/make/golangci.yml — copy to repo root as .golangci.yml.
+# `.go/` exclusion keeps CI cache dir (GOPATH=$CI_PROJECT_DIR/.go) out of analysis.
+version: "2"
+
+linters:
+  enable:
+    - decorder
+    - durationcheck
+    - errorlint
+    - gocyclo
+    - gosec
+    - importas
+    - misspell
+    - reassign
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - goconst
+    - mnd
+    - nolintlint
+    - staticcheck
+  disable:
+    - godot
+  settings:
+    gocyclo:
+      min-complexity: 13
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    mnd:
+      ignored-numbers:
+        - '0'
+        - '1'
+        - '2'
+        - '10'
+        - '100'
+        - '1000'
+        - '1024'
+      ignored-functions:
+        - 'time.Second'
+        - 'time.Minute'
+        - 'time.Hour'
+        - 'make'
+        - 'append'
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - \.go/
+      - generated/
+      - dist/
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - dupl
+          - gosec
+        text: "G102|G107|G115|G402"
+      - path: .go
+        linters:
+          - gosec
+        text: "G204"
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - \.go/
+      - dist/

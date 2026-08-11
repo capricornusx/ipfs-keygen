@@ -1,0 +1,30 @@
+# Gitleaks configuration — allowlist for safe false positives (ipfs-media ecosystem).
+# Canonical source: ci-templates/hooks/gitleaks.toml — copy to repo root as .gitleaks.toml
+# extend.useDefault обязателен: без него файл ЗАМЕЩАЕТ встроенные правила gitleaks.
+
+[extend]
+  useDefault = true
+
+[[allowlists]]
+  description = "jwt.io sample token in tests (deliberately invalid)"
+  stopwords = [
+    "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+  ]
+
+# IPFS content identifiers look like high-entropy secrets to generic rules.
+[[allowlists]]
+  description = "IPFS CIDs (base58/base32 content identifiers, not secrets)"
+  regexTarget = "match"
+  regexes = [
+    '''\bQm[1-9A-HJ-NP-Za-km-z]{44}\b''',
+    '''\bba(fy|fk|fyb|zgb)[a-z2-7]{20,}\b''',
+  ]
+
+# libp2p PeerID и IPNS-имена: публичные идентификаторы узлов, не секреты.
+[[allowlists]]
+  description = "libp2p PeerID (base58) and IPNS name (base36) public identifiers"
+  regexTarget = "match"
+  regexes = [
+    '''\b12D3KooW[1-9A-HJ-NP-Za-km-z]{38,46}\b''',
+    '''\bk51qzi5uqu5[a-z0-9]{40,60}\b''',
+  ]

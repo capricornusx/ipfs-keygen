@@ -1,9 +1,11 @@
 # Binaries
 bin/
+dist/
 *.exe
 *.dll
 *.so
 *.dylib
+*.iml
 ipfs-key
 ipfs-key-*
 keys/

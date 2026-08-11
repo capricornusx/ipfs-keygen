@@ -1,111 +1,90 @@
 # ipfs-keygen
 
-> A high-performance tool for generating and reading IPFS keypairs with vanity address support
+Генератор IPFS/IPNS-ключей Ed25519 с поиском ключей, чьи PeerID или IPNS-имена оканчиваются на заданные суффиксы. Полезен для получения запоминающихся IPNS-адресов или выделенных ключей для нод и релизов. В отличие от ручного перебора, использует все доступные ядра CPU и сразу сохраняет найденные ключи в файлы.
 
-⚡ **Performance: ~540,000 keys/second** on 16-core CPU
+- **Vanity-суффиксы.** Ищет совпадения в PeerID и/или IPNS base36 по списку через запятую.
+- **Режимы поиска.** `all` (по умолчанию), `peerid` или `ipns`.
+- **Многопоточность.** Количество воркеров равно `runtime.NumCPU()`.
+- **Сохранение.** Ключи пишутся в `keys/<kind>/<suffix>_<timestamp>.key` с правами `0600`.
+- **Чтение ключей.** `ipfs-key -key <path>` показывает PeerID, IPNS base36 и base64 приватного ключа.
+- **Минимальная длина суффикса.** 4 символа.
 
-## Table of Contents
-
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Fast Vanity Key Generation](#fast-vanity-key-generation)
-  - [Standard Key Generation](#standard-key-generation)
-  - [Reading Keys](#reading-keys)
-  - [Using Keys with IPFS](#using-keys-with-ipfs)
-- [Performance](#performance)
-- [License](#license)
-
-## Installation
+## Пример
 
 ```bash
-# Build from source
 make build
+
+dist/ipfs-key -timeout=1m -mode=ipns -suff=music
+# Config: Workers=16, Suffixes=[music], Timeout=1m0s, Mode=ipns
+# Starting key generation...
+#
+# [10s] N keys | R keys/s | 1/1 suffixes remaining
+#
+# ID for generated key: 12D3KooWM71jqVWgASHvhKTcqi8q3HNyuLzYx81s5Vqtzteomusic
+# PKey(base36): k51qzi5uqu5dkd2ayemr7z4naf7wedezvchgwi5o9fn9t43mryppe4bww3uuib
+# Matched: ipns
+# Key saved: keys/ipns/music_20260810_123045.key
+#
+# Total: N keys in T s (R keys/s)
+# Found 1/1 keys!
+#   - music (ipns)
 ```
 
-## Usage
-
-### Fast Vanity Key Generation
-
-Generate keys with custom suffixes at high speed:
+## Быстрый старт
 
 ```bash
-ipfs-key -timeout=1m -suff=test,cool,music
+# 1. Сборка
+make build                 # -> dist/ipfs-key
 
-# Output:
-Config: Workers=16, Suffixes=[test cool music], Timeout=1m0s
-Starting key generation...
+# 2. Сгенерировать ключ с нужным суффиксом
+dist/ipfs-key -timeout=5m -mode=ipns -suff=music,blog
 
-[5s] 2680000 keys | 536000 keys/s
-ID for generated key: 12D3KooWM71jqVWgASHvhKTcqi8q3HNyuLzYx81s5Vqtzteotest
-PKey(base36): k51qzi5uqu5dkd2ayemr7z4naf7wedezvchgwi5o9fn9t43mryppe4bww3uuib
+# 3. Импортировать в Kubo
+ipfs key import mysite keys/ipns/music_*.key
 
-💾 Key saved: keys/test_20260118_023938.key
-
-✓ Found!
+# 4. Опубликовать контент через IPNS
+ipfs name publish --key=mysite /ipfs/QmHash...
+# Контент доступен по адресу /ipns/<peerid>...music
 ```
 
-**Options:**
-- `-suff=test,cool` - Comma-separated list of suffixes (min 3 chars)
-- `-timeout=1m` - Maximum search time (default: 10m)
+## Готовый набор суффиксов
 
-**Key Storage:****
-- Keys are automatically saved to `keys/` directory
-- Filename format: `keys/{suffix}_{timestamp}.key`
-- File permissions: 0600 (read/write for owner only)
-
-**Performance:**
-- 3 chars: ~0.1 seconds
-- 4 chars: ~7 seconds
-- 5 chars: ~3 minutes
-
-### Reading Keys
-
-Display information about existing keys:
+В Makefile есть цель `run`, которая запускает генерацию фиксированного набора суффиксов:
 
 ```bash
-ipfs-key -key my-key.key
-
-# Output:
-Reading key at: my-key.key
-Success!
-ID for ed25519 key: 12D3KooWF1TKgiqLMh14za7dWMN5RFRC1WAvgHYioksmdwuhZkzT
-Private key (base64): CAESQLg...
+make run
+# эквивалентно:
+# ./dist/ipfs-key -timeout=10m -mode=ipns \
+#   -suff=kubo,bench,release,latest,swarmagent,bbuild,abuild,petabyte,science
 ```
 
-### Using Keys with IPFS
-
-Import generated keys into IPFS:
+## Использование существующего ключа
 
 ```bash
-# Import key
-ipfs key import mykey keys/music_20260118_023938.key
-
-# Publish content with vanity address
-ipfs name publish --key=mykey /ipfs/QmHash...
-
-# Your content is now at: /ipns/12D3KooW...music
+dist/ipfs-key -key keys/ipns/music_20260810_123045.key
+# ID for ed25519 key: 12D3KooW...music
+# ID (base36/IPNS): k51qzi5uqu5...
+# Private key (base64): CAESQLg...
 ```
 
-See [USAGE.md](USAGE.md) for detailed examples and advanced usage.
+## Разработка
 
-## Performance
-
-This implementation is highly optimized for multi-core CPUs:
-
-- **Throughput**: ~540,000 keys/second (16 cores)
-- **Efficiency**: Zero allocations in hot path
-- **Scaling**: Linear scaling across CPU cores
-- **Memory**: Minimal GC pressure
-
-See [PERFORMANCE_COMPARISON.md](PERFORMANCE_COMPARISON.md) for detailed benchmarks.
-
-### Calculate Probability
-
-Estimate time to find a vanity suffix:
+В репозитории действует единый Makefile-контракт:
 
 ```bash
-make probability SUFF=test,cool,music
+make lint    # golangci-lint, read-only
+make test    # go test -count=1 -short
+make build   # бинарь в dist/
+make help    # все цели репо
 ```
+
+Git hooks:
+
+```bash
+lefthook install
+```
+
+Подробные сценарии использования, импорт через Kubo API и безопасность ключей описаны в [USAGE.md](USAGE.md).
 
 ## License
 
