@@ -1,0 +1,46 @@
+# Lefthook configuration for ipfs-media ecosystem.
+#
+# Copies to each repo and install via: lefthook install
+# Canonical source: ci-templates/hooks/lefthook.yml
+#
+# Pre-commit:  fast checks on staged files (secrets, forbidden filenames).
+# Pre-push:    scan the pushed commit range for secrets that slipped through.
+#
+# Gitleaks is the primary secret scanner — same engine as GitLab Secret Detection.
+# Custom rules in .gitleaks.toml suppress false positives on CID/base64 hashes.
+
+pre-commit:
+  parallel: true
+  commands:
+    secrets-staged:
+      run: gitleaks protect --staged --redact --no-banner
+      skip:
+        - rebase
+    forbidden-files:
+      run: |
+        git diff --cached --name-only | grep -iE '\.(pem|key)$|(^|/)\.env$|id_ed25519|id_rsa|id_ecdsa' \
+          && { echo "BLOCKED: forbidden file staged (key/credential)."; exit 1; } \
+          || true
+      skip:
+        - rebase
+
+pre-push:
+  commands:
+    secrets-range:
+      # HEAD --not --remotes: только коммиты, которых нет на remote — корректно
+      # и для веток, и для тегов (плейсхолдеры {remote_branch} на тегах пустые).
+      run: gitleaks git --redact --no-banner --log-opts="HEAD --not --remotes"
+    # Release gate: при пуше тега (HEAD указывает на тег v*) прогоняем полную
+    # локальную проверку (gofmt/vet/lint/test/gitleaks/govulncheck/trivy) через
+    # make release-check. Обычный push ветки этот gate не запускает.
+    release-gate:
+      run: |
+        tag="$(git describe --exact-match --tags HEAD 2>/dev/null || true)"
+        if [ -n "$tag" ] && echo "$tag" | grep -q '^v'; then
+          echo "🏷️  Pushing tag $tag — running release gate..."
+          make release-check
+        else
+          exit 0
+        fi
+      skip:
+        - rebase

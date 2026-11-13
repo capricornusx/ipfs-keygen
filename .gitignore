@@ -1,0 +1,36 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.iml
+ipfs-key
+ipfs-key-*
+keys/
+
+# Test and profile files
+*.test
+*.prof
+*.out
+
+# Generated keys
+*.key
+private.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+cmd/*/ipfs-key*
+!cmd/*/main.go
+
